@@ -1,0 +1,5 @@
+Nama Lengkap : Nurul Izzah
+Asal Kampus	 : STMIK YMI Tegal
+Alur Belajar : Front-End dan Back-End Developer
+Cohort ID	 : FC820D5X0812
+URL Deployment: 

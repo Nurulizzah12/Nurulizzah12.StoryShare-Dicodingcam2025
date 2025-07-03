@@ -1,0 +1,50 @@
+{
+  "name": "Story App Share",
+  "short_name": "StoryApp",
+  "description": "Aplikasi berbagi cerita dari seluruh Indonesia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#be279e",
+  "icons": [
+    {
+      "src": "/images/icons/maskable-icon-x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icons/maskable-icon-x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/images/icons/icon-x144.png",
+      "type": "image/png",
+      "sizes": "144x144",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/images/screenshots/screenshot-desktop-1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Tampilan Beranda Aplikasi di Desktop"
+    },
+    {
+      "src": "/images/screenshots/screenshot-mobile-1.png",
+      "sizes": "360x640",
+      "type": "image/png",
+      "label": "Tampilan Beranda Aplikasi di Mobile"
+    },
+    {
+      "src": "/images/screenshots/screenshot-detail-mobile.png",
+      "sizes": "360x640",
+      "type": "image/png",
+      "label": "Tampilan Detail Cerita di Mobile"
+    }
+  ]
+}
