@@ -20,8 +20,15 @@ const DetailPage = {
         <div id="story" class="story"></div>
         <div id="loading" class="loading-indicator" style="display: none;">Memuat...</div>
         <div id="error-container" class="error-container" style="display: none;"></div>
-        <!-- Tambahkan container untuk peta -->
-        <div id="detail-map-container" style="height: 400px; margin-top: 20px;"></div>
+        <!-- Container untuk peta dengan offline support -->
+        <div id="detail-map-container" style="height: 400px; margin-top: 20px; position: relative;">
+          <div id="map-loading" class="map-loading" style="display: none;">
+            <div class="loading-content">
+              <div class="spinner"></div>
+              <p>Memuat peta...</p>
+            </div>
+          </div>
+        </div>
       </div>
     `;
   },
@@ -32,6 +39,7 @@ const DetailPage = {
     const loadingElement = document.querySelector('#loading');
     const errorContainer = document.querySelector('#error-container');
     const detailMapContainer = document.querySelector('#detail-map-container');
+    const mapLoadingElement = document.querySelector('#map-loading');
 
     // Get the story ID from URL
     const url = UrlParser.parseActiveUrlWithoutCombiner();
@@ -153,165 +161,264 @@ const DetailPage = {
         showModalMessageBox('Error Memuat Cerita', userMessage);
       },
       
-      // Perbaikan untuk event listener di detail-page.js
-// Ganti bagian showStoryDetail di DetailPage dengan yang ini:
-
-showStoryDetail(story) {
-    console.log('✅ DetailPage View: Showing story detail:', story);
-    
-    // Validasi data story sebelum render
-    if (!story || !story.id) {
-        console.error('❌ Invalid story data received:', story);
-        this.showError(new Error('Data cerita tidak valid dari server'));
-        return;
-    }
-    
-    storyContainer.innerHTML = createStoryDetailTemplate(story);
-    
-    // Initialize map if coordinates are available
-    if (story.latitude && story.longitude) {
-        console.log('🗺️ Rendering map for story location');
-        this.renderMap(story.latitude, story.longitude, story.location || 'Lokasi Cerita');
-    } else {
-        console.log('ℹ️ No location data available for map');
-        // Hide map container if no location data
-        if (detailMapContainer) {
-            detailMapContainer.style.display = 'none';
+      showStoryDetail(story) {
+        console.log('✅ DetailPage View: Showing story detail:', story);
+        
+        // Validasi data story sebelum render
+        if (!story || !story.id) {
+            console.error('❌ Invalid story data received:', story);
+            this.showError(new Error('Data cerita tidak valid dari server'));
+            return;
         }
-    }
-
-    // ✅ PERBAIKAN: Event listener untuk tombol simpan dengan error handling yang lebih baik
-    const saveStoryBtn = document.getElementById('saveStoryBtn');
-    if (saveStoryBtn) {
-        saveStoryBtn.addEventListener('click', async (event) => {
-            event.preventDefault();
-            console.log('🔄 Save button clicked, story:', story);
-            
-            // Disable button sementara untuk mencegah multiple clicks
-            saveStoryBtn.disabled = true;
-            saveStoryBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
-            
-            try {
-                // Pastikan ada konfirmasi yang jelas
-                const confirmResult = await new Promise((resolve) => {
-                    if (typeof showModalMessageBox === 'function' && showModalMessageBox.length >= 3) {
-                        // Jika showModalMessageBox mendukung callback
-                        showModalMessageBox('Konfirmasi Simpan', 'Apakah Anda yakin ingin menyimpan cerita ini?', resolve, true);
-                    } else {
-                        // Fallback menggunakan confirm browser
-                        const result = confirm('Apakah Anda yakin ingin menyimpan cerita ini?');
-                        resolve(result);
-                    }
-                });
-                
-                if (confirmResult) {
-                    console.log('🔄 User confirmed, saving story...');
-                    
-                    // Pastikan storyRepository terdefinisi
-                    if (!storyRepository) {
-                        throw new Error('StoryRepository tidak tersedia');
-                    }
-                    
-                    // Pastikan method saveStory ada
-                    if (typeof storyRepository.saveStory !== 'function') {
-                        throw new Error('Method saveStory tidak tersedia di StoryRepository');
-                    }
-                    
-                    await storyRepository.saveStory(story);
-                    
-                    // Berhasil disimpan
-                    saveStoryBtn.innerHTML = '<i class="fas fa-check"></i> Tersimpan!';
-                    saveStoryBtn.classList.add('success');
-                    
-                    // Reset button setelah 2 detik
-                    setTimeout(() => {
-                        saveStoryBtn.innerHTML = '<i class="fas fa-bookmark"></i> Simpan Story';
-                        saveStoryBtn.classList.remove('success');
-                        saveStoryBtn.disabled = false;
-                    }, 2000);
-                    
-                    console.log('✅ Story saved successfully');
-                } else {
-                    console.log('ℹ️ User cancelled save operation');
-                    // Reset button jika user batal
-                    saveStoryBtn.innerHTML = '<i class="fas fa-bookmark"></i> Simpan Story';
-                    saveStoryBtn.disabled = false;
-                }
-                
-            } catch (saveError) {
-                console.error('❌ Failed to save story:', saveError);
-                
-                // Reset button dengan status error
-                saveStoryBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal Menyimpan';
-                saveStoryBtn.classList.add('error');
-                saveStoryBtn.disabled = false;
-                
-                // Show error message
-                const errorMessage = saveError.message || 'Terjadi kesalahan saat menyimpan cerita';
-                showModalMessageBox('Simpan Gagal', errorMessage);
-                
-                // Reset button setelah 3 detik
-                setTimeout(() => {
-                    saveStoryBtn.innerHTML = '<i class="fas fa-bookmark"></i> Simpan Story';
-                    saveStoryBtn.classList.remove('error');
-                }, 3000);
-            }
-        });
-    } else {
-        console.error('❌ Save button not found in DOM');
-    }
-
-    // Event listener untuk tombol notifikasi
-    const tryNotificationBtn = document.getElementById('tryNotificationBtn');
-    if (tryNotificationBtn) {
-        tryNotificationBtn.addEventListener('click', () => {
-            console.log('🔔 Notification button clicked');
-            showModalMessageBox('Notifikasi Percobaan', `Anda akan mendapatkan notifikasi untuk: ${story.title}`);
-        });
-    }
-
-    // Event listener untuk tombol kembali
-    const backToListBtn = document.getElementById('backToListBtn');
-    if (backToListBtn) {
-        backToListBtn.addEventListener('click', () => {
-            console.log('🔙 Back button clicked');
-            window.location.hash = '#/';
-        });
-    }
-},
-      
-      renderMap(lat, lon, locationName = 'Lokasi Cerita') {
-        if (detailMapContainer && typeof L !== 'undefined') {
-            detailMapContainer.id = 'map-instance';
-            detailMapContainer.style.display = 'block';
-            
-            try {
-              MapHelper.initMap(document.getElementById('map-instance'), {
-                lat: lat,
-                lng: lon,
-                zoom: 13,
-              });
-              
-              const mapInstance = MapHelper.getMapInstance(document.getElementById('map-instance'));
-              if (mapInstance) {
-                  L.marker([lat, lon]).addTo(mapInstance)
-                      .bindPopup(locationName)
-                      .openPopup();
-                  mapInstance.invalidateSize();
-                  console.log('✅ Map rendered successfully');
-              } else {
-                  throw new Error('Map instance not found');
-              }
-            } catch (mapError) {
-              console.error('❌ Error rendering map:', mapError);
-              detailMapContainer.innerHTML = '<div class="error-message">Peta tidak dapat dimuat.</div>';
-            }
+        
+        storyContainer.innerHTML = createStoryDetailTemplate(story);
+        
+        // Initialize map dengan offline support jika koordinat tersedia
+        if (story.latitude && story.longitude) {
+            console.log('🗺️ Rendering offline-capable map for story location');
+            this.renderOfflineMap(story.latitude, story.longitude, story.location || story.name || 'Lokasi Cerita');
         } else {
-            console.warn('⚠️ Map container or Leaflet JS not available');
+            console.log('ℹ️ No location data available for map');
+            // Hide map container if no location data
             if (detailMapContainer) {
-                detailMapContainer.innerHTML = '<div class="info-message">Peta lokasi tidak tersedia.</div>';
+                detailMapContainer.innerHTML = '<div class="info-message">📍 Lokasi tidak tersedia untuk cerita ini</div>';
                 detailMapContainer.style.display = 'block';
             }
+        }
+
+        // ✅ Event listener untuk tombol simpan dengan error handling yang lebih baik
+        const saveStoryBtn = document.getElementById('saveStoryBtn');
+        if (saveStoryBtn) {
+            saveStoryBtn.addEventListener('click', async (event) => {
+                event.preventDefault();
+                console.log('🔄 Save button clicked, story:', story);
+                
+                // Disable button sementara untuk mencegah multiple clicks
+                saveStoryBtn.disabled = true;
+                saveStoryBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Menyimpan...';
+                
+                try {
+                    // Pastikan ada konfirmasi yang jelas
+                    const confirmResult = await new Promise((resolve) => {
+                        if (typeof showModalMessageBox === 'function' && showModalMessageBox.length >= 3) {
+                            // Jika showModalMessageBox mendukung callback
+                            showModalMessageBox('Konfirmasi Simpan', 'Apakah Anda yakin ingin menyimpan cerita ini?', resolve, true);
+                        } else {
+                            // Fallback menggunakan confirm browser
+                            const result = confirm('Apakah Anda yakin ingin menyimpan cerita ini?');
+                            resolve(result);
+                        }
+                    });
+                    
+                    if (confirmResult) {
+                        console.log('🔄 User confirmed, saving story...');
+                        
+                        // Pastikan storyRepository terdefinisi
+                        if (!storyRepository) {
+                            throw new Error('StoryRepository tidak tersedia');
+                        }
+                        
+                        // Pastikan method saveStory ada
+                        if (typeof storyRepository.saveStory !== 'function') {
+                            throw new Error('Method saveStory tidak tersedia di StoryRepository');
+                        }
+                        
+                        await storyRepository.saveStory(story);
+                        
+                        // Berhasil disimpan
+                        saveStoryBtn.innerHTML = '<i class="fas fa-check"></i> Tersimpan!';
+                        saveStoryBtn.classList.add('success');
+                        
+                        // Reset button setelah 2 detik
+                        setTimeout(() => {
+                            saveStoryBtn.innerHTML = '<i class="fas fa-bookmark"></i> Simpan Story';
+                            saveStoryBtn.classList.remove('success');
+                            saveStoryBtn.disabled = false;
+                        }, 2000);
+                        
+                        console.log('✅ Story saved successfully');
+                    } else {
+                        console.log('ℹ️ User cancelled save operation');
+                        // Reset button jika user batal
+                        saveStoryBtn.innerHTML = '<i class="fas fa-bookmark"></i> Simpan Story';
+                        saveStoryBtn.disabled = false;
+                    }
+                    
+                } catch (saveError) {
+                    console.error('❌ Failed to save story:', saveError);
+                    
+                    // Reset button dengan status error
+                    saveStoryBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Gagal Menyimpan';
+                    saveStoryBtn.classList.add('error');
+                    saveStoryBtn.disabled = false;
+                    
+                    // Show error message
+                    const errorMessage = saveError.message || 'Terjadi kesalahan saat menyimpan cerita';
+                    showModalMessageBox('Simpan Gagal', errorMessage);
+                    
+                    // Reset button setelah 3 detik
+                    setTimeout(() => {
+                        saveStoryBtn.innerHTML = '<i class="fas fa-bookmark"></i> Simpan Story';
+                        saveStoryBtn.classList.remove('error');
+                    }, 3000);
+                }
+            });
+        } else {
+            console.error('❌ Save button not found in DOM');
+        }
+
+        // Event listener untuk tombol notifikasi
+        const tryNotificationBtn = document.getElementById('tryNotificationBtn');
+        if (tryNotificationBtn) {
+            tryNotificationBtn.addEventListener('click', () => {
+                console.log('🔔 Notification button clicked');
+                showModalMessageBox('Notifikasi Percobaan', `Anda akan mendapatkan notifikasi untuk: ${story.title || story.name}`);
+            });
+        }
+
+        // Event listener untuk tombol kembali
+        const backToListBtn = document.getElementById('backToListBtn');
+        if (backToListBtn) {
+            backToListBtn.addEventListener('click', () => {
+                console.log('🔙 Back button clicked');
+                window.location.hash = '#/';
+            });
+        }
+      },
+      
+      // ✅ PERBAIKAN: Render map dengan offline support
+      async renderOfflineMap(lat, lon, locationName = 'Lokasi Cerita') {
+        if (!detailMapContainer) {
+            console.error('❌ Map container not found');
+            return;
+        }
+
+        // Show loading indicator
+        if (mapLoadingElement) {
+            mapLoadingElement.style.display = 'flex';
+        }
+
+        try {
+            // Pastikan Leaflet tersedia
+            if (typeof L === 'undefined') {
+                throw new Error('Leaflet library tidak tersedia');
+            }
+
+            // Buat container untuk map dengan ID yang unik
+            const mapId = 'story-detail-map';
+            detailMapContainer.innerHTML = `
+              <div id="${mapId}" style="height: 100%; width: 100%;"></div>
+              <div class="map-controls">
+                <button id="map-info-btn" class="map-info-btn" title="Info Cache Map">
+                  <i class="fas fa-info-circle"></i>
+                </button>
+                <button id="clear-cache-btn" class="clear-cache-btn" title="Bersihkan Cache Map">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            `;
+
+            // Inisialisasi map dengan offline support
+            const mapInstance = await mapUtilsOffline.initOfflineMap(mapId, lat, lon, 13);
+            
+            if (mapInstance) {
+                console.log('✅ Offline map initialized successfully');
+                
+                // Tambahkan event listeners untuk kontrol map
+                this.addMapControls(mapInstance);
+                
+                // Hide loading indicator
+                if (mapLoadingElement) {
+                    mapLoadingElement.style.display = 'none';
+                }
+                
+                // Invalidate size untuk memastikan map render dengan benar
+                setTimeout(() => {
+                    mapInstance.invalidateSize();
+                }, 100);
+                
+            } else {
+                throw new Error('Gagal menginisialisasi map instance');
+            }
+
+        } catch (mapError) {
+            console.error('❌ Error rendering offline map:', mapError);
+            
+            // Hide loading indicator
+            if (mapLoadingElement) {
+                mapLoadingElement.style.display = 'none';
+            }
+            
+            // Fallback ke MapHelper yang sudah ada
+            console.log('🔄 Falling back to original MapHelper...');
+            await this.renderFallbackMap(lat, lon, locationName);
+        }
+      },
+
+      // Fallback ke map helper yang sudah ada
+      async renderFallbackMap(lat, lon, locationName) {
+        try {
+            if (typeof MapHelper !== 'undefined' && MapHelper.initMap) {
+                const mapId = 'story-detail-map-fallback';
+                detailMapContainer.innerHTML = `<div id="${mapId}" style="height: 100%; width: 100%;"></div>`;
+                
+                MapHelper.initMap(document.getElementById(mapId), {
+                    lat: lat,
+                    lng: lon,
+                    zoom: 13,
+                });
+                
+                const mapInstance = MapHelper.getMapInstance(document.getElementById(mapId));
+                if (mapInstance) {
+                    L.marker([lat, lon]).addTo(mapInstance)
+                        .bindPopup(locationName)
+                        .openPopup();
+                    mapInstance.invalidateSize();
+                    console.log('✅ Fallback map rendered successfully');
+                } else {
+                    throw new Error('Fallback map instance not found');
+                }
+            } else {
+                throw new Error('MapHelper tidak tersedia');
+            }
+        } catch (fallbackError) {
+            console.error('❌ Fallback map also failed:', fallbackError);
+            detailMapContainer.innerHTML = `
+              <div class="error-message">
+                <h4>❌ Peta tidak dapat dimuat</h4>
+                <p>Lokasi: ${locationName}</p>
+                <p>Koordinat: ${lat}, ${lon}</p>
+                <p>Error: ${fallbackError.message}</p>
+                <button onclick="window.location.reload()" class="btn-retry">🔄 Coba Lagi</button>
+              </div>
+            `;
+        }
+      },
+
+      // Tambahkan kontrol untuk map
+      addMapControls(mapInstance) {
+        const mapInfoBtn = document.getElementById('map-info-btn');
+        const clearCacheBtn = document.getElementById('clear-cache-btn');
+
+        if (mapInfoBtn) {
+            mapInfoBtn.addEventListener('click', async () => {
+                const cacheInfo = await mapUtilsOffline.getCacheInfo();
+                showModalMessageBox('Info Cache Map', `
+                  Tiles tersimpan: ${cacheInfo.tileCount}
+                  Status: ${cacheInfo.isOnline ? 'Online' : 'Offline'}
+                  Map instances: ${cacheInfo.mapInstances}
+                `);
+            });
+        }
+
+        if (clearCacheBtn) {
+            clearCacheBtn.addEventListener('click', async () => {
+                const confirmed = confirm('Apakah Anda yakin ingin menghapus cache map? Ini akan menghapus semua tiles yang tersimpan.');
+                if (confirmed) {
+                    await mapUtilsOffline.clearTileCache();
+                    showModalMessageBox('Cache Dibersihkan', 'Cache map telah berhasil dibersihkan.');
+                }
+            });
         }
       }
     };
